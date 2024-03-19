@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-// TODO: Add file creating capabilities to populate memory
+#include <math.h>
 
 int **makeMemory(int rows, int cols){
     int **memoryUnit = (int**)malloc(rows * sizeof(int*));
@@ -30,11 +29,14 @@ void populateMemory(int **mem, int numBlocks, int numWords) {
     }
 }
 
+int getMemAddressLength(int numBlocks) {
+	int addrLen = (int)floor(log(numBlocks) / log(16));
+	return addrLen;
+}
 void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* dataFile) {
 
-	//NOTE: Adjusting first line for better addressing
-	int lenBlockAddr = numBlocks / 16;
-	int numSpaces = lenBlockAddr + 4;
+	int lenBlockAddr = getMemAddressLength(numBlocks) + 1;
+	int numSpaces = lenBlockAddr + 6; //align word index with data
 	char spaces[numSpaces + 1]; //+1 for \0 character
 	
 	memset(spaces, ' ', numSpaces);
@@ -51,7 +53,7 @@ void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* data
 	}
 
     for(int i = 0; i < numBlocks; i++) {
-        fprintf(dataFile, "%0*x: [ ", lenBlockAddr, i);
+        fprintf(dataFile, "0x%0*x: [ ", lenBlockAddr, i);
         for (int j = 0; j < numWords; j++) {
             fprintf(dataFile, "%02x ", memoryUnit[i][j]);
         }

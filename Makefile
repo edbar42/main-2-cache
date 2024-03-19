@@ -1,2 +1,2 @@
 file: main.c
-	gcc -Wall -Wextra -std=c2x -pedantic -g main.c -o main
+	gcc -Wall -Wextra -std=c2x -pedantic -g -lm main.c -o main
