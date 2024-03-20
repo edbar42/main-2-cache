@@ -9,7 +9,7 @@ int getMemAddressLength(int numBlocks);
 void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* dataFile);
 void printCacheState(int **memoryUnit, int numBlocks, int numWords);
 void printUserPrompt();
-void findAddrData(int addr, int **mainMemory);
+int* findDataBlock(int **mainMemory);
 void applyMappingMethod(int addr, int **mainMemory, int **cache,int mappingMethodOption);
 struct mem getMemorySize();
 
@@ -45,8 +45,13 @@ int main(void) {
 
 
 	puts("Cache memory content:");
-printCacheState(cacheMemory, memData.numLines, lineSize);
+	printCacheState(cacheMemory, memData.numLines, lineSize);
 
+	for (int i = 0; i < 3; i++) {
+		int *data;
+		data = findDataBlock(mainMemory);
+		printf("%d\n", *data);
+	}
 	//freeing memory used
 	free(mainMemory);
 	free(cacheMemory);
@@ -105,7 +110,12 @@ void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* data
 	}
 
 	for(int i = 0; i < numBlocks; i++) {
-		fprintf(dataFile, "0x%0*x: [ ", lenBlockAddr, i * numWords);
+		if (i == 0) {
+			fprintf(dataFile, "0x%0*x: [ ", lenBlockAddr, 0);
+		} else {
+			fprintf(dataFile, "0x%0*x: [ ", lenBlockAddr, i * numWords);
+		}
+
 		for (int j = 0; j < numWords; j++) {
 			fprintf(dataFile, "%02x ", memoryUnit[i][j]);
 		}
@@ -145,7 +155,8 @@ void printUserPrompt() {
 	puts("\t* Lastly, you will choose the mapping method.");
 
 	puts(" ");
-	puts("\t* ATTENTION: This programs considers every line/block of memory to be 16 Bytes long. Therefore, inputting values lesser than 128 Bytes for main memory and cache will result in unexpected behaviour.");
+	puts("\t* ATTENTION: This programs considers every line/block of memory to be 16 Bytes long.");
+	puts("Therefore, inputting values lesser than 128 Bytes for main memory and cache may cause unexpected behaviour.");
 
 	puts(" ");
 	puts("\t Let\'s begin!");
@@ -168,4 +179,14 @@ struct mem getMemorySize() {
 	struct mem memData = { .mainMemorySize = mainSize, .cacheSize  = cacheSize, .numTags = mainSize/cacheSize, .numBlocks = mainSize/16, .numLines = cacheSize/16 };
 
 	return memData;
+}
+
+int* findDataBlock(int **mainMemory){
+	puts("Insert a memory address:");
+	long addr = 0;
+	scanf("%ld", &addr);
+	
+	int blockNumber = (int)addr / 16;
+
+	return mainMemory[blockNumber];
 }
