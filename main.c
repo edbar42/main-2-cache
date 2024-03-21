@@ -8,9 +8,11 @@ void populateMemory(int **mem, int numBlocks, int numWords);
 int getMemAddressLength(int numBlocks);
 void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* dataFile);
 void printCacheState(int **memoryUnit, int numBlocks, int numWords);
+void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile, int mappingMethod);
+void populateCache(int *line, int **cache);
+void mapToCache(int **memoryUnit,int numLines, int mappingMethod, int* dataToCache);
 void printUserPrompt();
 int* findDataBlock(int **mainMemory);
-void applyMappingMethod(int addr, int **mainMemory, int **cache,int mappingMethodOption);
 struct mem getMemorySize();
 
 struct mem {
@@ -35,7 +37,18 @@ int main(void) {
 	int **cacheMemory = makeMemory(memData.numLines, lineSize);
 
 	FILE* memFile = fopen("mem.dat", "w");
+	FILE* cacheLog = fopen("cache.log", "w");
 
+	puts("Next, choose a mapping method:");
+	puts("0 - Direct, 1 - Set Associative, 2 - Fully Associative");
+
+	int mappingMethod;
+	scanf("%d", &mappingMethod);
+
+	if (mappingMethod < 0 || mappingMethod > 2) {
+		puts("Error! Not a valid option. Run the program again and retry.");
+		return -1;
+	}
 
 	puts("Populating main memory with data.");
 	populateMemory(mainMemory, memData.numBlocks, lineSize);
@@ -50,7 +63,10 @@ int main(void) {
 	for (int i = 0; i < 3; i++) {
 		int *data;
 		data = findDataBlock(mainMemory);
-		printf("%d\n", *data);
+		mapToCache(cacheMemory, memData.numLines, mappingMethod, data);
+		printCacheState(cacheMemory, memData.numLines, lineSize);
+		logCacheState(cacheMemory, memData.numLines, lineSize, cacheLog, mappingMethod);
+
 	}
 	//freeing memory used
 	free(mainMemory);
@@ -189,4 +205,38 @@ int* findDataBlock(int **mainMemory){
 	int blockNumber = (int)addr / 16;
 
 	return mainMemory[blockNumber];
+}
+
+void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile, int mappingMethod){
+	char* mapping;
+
+	switch (mappingMethod) {
+		case 0:
+			mapping = "DIRECT";
+			break;
+		case 1:
+			mapping = "SET ASSOCIATIVE";
+			break;
+		case 2:
+			mapping = "FULLY ASSOCIATIVE";
+			break;
+	}
+	fprintf(logFile, "MAPPING: %s\n", mapping);
+
+	writeMemoryToFile(memoryUnit, numBlocks, numWords, logFile);
+}
+
+
+void mapToCache(int **memoryUnit,int numLines, int mappingMethod, int* dataToCache) {
+	switch (mappingMethod) {
+		case 0:
+			// NOTE: Direct mapping
+			break;
+		case 1:
+			// NOTE: Set associative mapping
+			break;
+		case 2:
+			// NOTE: Fully associative mapping
+			break;
+	}
 }
