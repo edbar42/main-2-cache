@@ -258,6 +258,7 @@ void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile,
 
 void mapToCache(int **cache, int numLines, int mappingMethod, int* dataToCache, int blockIndex) {
 	int cacheLine = blockIndex % numLines;
+	int fACacheLine = rand() % numLines;
 	switch (mappingMethod) {
 		case 0:
 			// NOTE: Direct mapping
@@ -268,6 +269,7 @@ void mapToCache(int **cache, int numLines, int mappingMethod, int* dataToCache, 
 			break;
 		case 2:
 			// NOTE: Fully associative mapping
+			cache[fACacheLine] = dataToCache;
 			break;
 	}
 }
