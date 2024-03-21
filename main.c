@@ -3,14 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define LINESIZE 16
+
 int **makeMemory(int rows, int lineSize);
 void populateMemory(int **mem, int numBlocks, int numWords);
 int getMemAddressLength(int numBlocks);
 void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* dataFile);
-void printCacheState(int **memoryUnit, int numBlocks, int numWords);
-void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile, int mappingMethod);
+void printCacheState(int **memoryUnit, int numBlocks, int numWords, int hitOrMiss);
+void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile, int mappingMethod, long memAddr, int hitOrMiss);
 void populateCache(int *line, int **cache);
-void mapToCache(int **memoryUnit,int numLines, int mappingMethod, int* dataToCache);
+void mapToCache(int **cache, int numLines, int mappingMethod, int* dataToCache, int blockIndex);
 void printUserPrompt();
 int* findDataBlock(int **mainMemory);
 struct mem getMemorySize();
@@ -29,12 +31,11 @@ int main(void) {
 	printUserPrompt();
 	//NOTE: We have hard-coded that each 
 	//		line/block contains 16 words
-	int lineSize = 16;
 
 	struct mem memData = getMemorySize();
 
-	int **mainMemory = makeMemory(memData.numBlocks, lineSize);
-	int **cacheMemory = makeMemory(memData.numLines, lineSize);
+	int **mainMemory = makeMemory(memData.numBlocks, LINESIZE);
+	int **cacheMemory = makeMemory(memData.numLines, LINESIZE);
 
 	FILE* memFile = fopen("mem.dat", "w");
 	FILE* cacheLog = fopen("cache.log", "w");
@@ -51,23 +52,39 @@ int main(void) {
 	}
 
 	puts("Populating main memory with data.");
-	populateMemory(mainMemory, memData.numBlocks, lineSize);
+	populateMemory(mainMemory, memData.numBlocks, LINESIZE);
 
 	puts("Writing main memory content to file...");
-	writeMemoryToFile(mainMemory, memData.numBlocks, lineSize, memFile);
+	writeMemoryToFile(mainMemory, memData.numBlocks, LINESIZE, memFile);
 
 
 	puts("Cache memory content:");
-	printCacheState(cacheMemory, memData.numLines, lineSize);
+	printCacheState(cacheMemory, memData.numLines, LINESIZE, 2);
 
 	for (int i = 0; i < 3; i++) {
-		int *data;
-		data = findDataBlock(mainMemory);
-		mapToCache(cacheMemory, memData.numLines, mappingMethod, data);
-		printCacheState(cacheMemory, memData.numLines, lineSize);
-		logCacheState(cacheMemory, memData.numLines, lineSize, cacheLog, mappingMethod);
+		puts("Insert a memory address:");
+		long addr = 0;
+		scanf("%ld", &addr);
+	
+		int blockIndex = (int)addr / 16;
+		int lineIndex = blockIndex % memData.numLines;
+		int* lineToCache = mainMemory[blockIndex];
+		int hitOrMiss = 0;
+
+		for(int i = 0; i < LINESIZE; i++) {
+			if(cacheMemory[lineIndex][i] != 0) {
+				hitOrMiss = 1;
+			}
+		}
+		
+		if (hitOrMiss == 0) {
+			mapToCache(cacheMemory, memData.numLines, mappingMethod, lineToCache, blockIndex);
+		}
+		printCacheState(cacheMemory, memData.numLines, LINESIZE, hitOrMiss);
+		logCacheState(cacheMemory, memData.numLines, LINESIZE, cacheLog, mappingMethod, addr, hitOrMiss);
 
 	}
+
 	//freeing memory used
 	free(mainMemory);
 	free(cacheMemory);
@@ -141,11 +158,17 @@ void writeMemoryToFile(int **memoryUnit, int numBlocks, int numWords, FILE* data
 	fflush(dataFile);
 }
 
-void printCacheState(int **memoryUnit, int numBlocks, int numWords) {
+void printCacheState(int **memoryUnit, int numBlocks, int numWords, int hitOrMiss) {
+	if(hitOrMiss == 0 ) {
+		puts("\n CACHE MISS\n");
+	} else if (hitOrMiss == 1) {
+		puts("\n CACHE HIT\n");
+	}
+
 	for(int i = 0; i < numBlocks; i++) {
 		printf("%02X: [ ", i);
 		for (int j = 0; j < numWords; j++) {
-			printf("%d ", memoryUnit[i][j]);
+			printf("%x ", memoryUnit[i][j]);
 		}
 		printf("]\n");
 	}
@@ -207,7 +230,7 @@ int* findDataBlock(int **mainMemory){
 	return mainMemory[blockNumber];
 }
 
-void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile, int mappingMethod){
+void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile, int mappingMethod, long memAddr, int hitOrMiss) {
 	char* mapping;
 
 	switch (mappingMethod) {
@@ -222,15 +245,23 @@ void logCacheState(int **memoryUnit, int numBlocks, int numWords, FILE* logFile,
 			break;
 	}
 	fprintf(logFile, "MAPPING: %s\n", mapping);
+	fprintf(logFile, "ADDRESS INSERTED: %lx\n", memAddr);
+	if(hitOrMiss == 0 ) {
+		fputs("\n CACHE MISS\n", logFile);
+	} else if (hitOrMiss == 1) {
+		fputs("\n CACHE HIT\n", logFile);
+	}
 
 	writeMemoryToFile(memoryUnit, numBlocks, numWords, logFile);
 }
 
 
-void mapToCache(int **memoryUnit,int numLines, int mappingMethod, int* dataToCache) {
+void mapToCache(int **cache, int numLines, int mappingMethod, int* dataToCache, int blockIndex) {
+	int cacheLine = blockIndex % numLines;
 	switch (mappingMethod) {
 		case 0:
 			// NOTE: Direct mapping
+			cache[cacheLine] = dataToCache;
 			break;
 		case 1:
 			// NOTE: Set associative mapping
