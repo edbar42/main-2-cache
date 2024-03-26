@@ -1,3 +1,4 @@
+#include <time.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -6,9 +7,13 @@
 // NOTE: 1 for cache, 0 for main memory
 // cache is set to zero, memory is set
 // to a random from 0 to 255
-int **make_memory(int rows, int mem_type);
 void print_ui();
-void write_memory_to_file(int **memory_unit, FILE* file);
+int hit_or_miss(int **cache, int* block);
+int **make_memory(int rows, int mem_type);
+void log_cache_state(int **cache, FILE* cache_file);
+void map_to_cache(int **cache, int *block, int mapping_method, int block_index);
+void write_memory_to_file(int **memory_unit, FILE* file, long memory_size);
+
 
 int LINESIZE;
 
@@ -21,6 +26,9 @@ struct Metadata {
 struct Metadata metadata;
 
 int main(void) {
+	// NOTE: Used to ensure actual random numbers
+	srand(time(NULL));
+
 	print_ui();
 
 	puts("How many bytes should each block/line have?");
@@ -33,32 +41,72 @@ int main(void) {
 	puts("How many bytes should the cache have?");
 	scanf("%ld", &metadata.cache_size); 
 	
-	int mapping_method = 0;
+	int cache_hit_or_miss;
+	int mapping_method;
 	FILE *memory_file = fopen("mem.dat", "w");
 	FILE *cache_file = fopen("cache.log", "w");
-
+	FILE *hit_log_file = fopen("hit.log", "w");
+	FILE *miss_log_file = fopen("miss.log", "w");
 
 	// Creates memory as an array
 	int **main_memory = make_memory(metadata.main_memory_size/LINESIZE, 0);
 	int **cache_memory = make_memory(metadata.cache_size/LINESIZE, 1);
 
-	write_memory_to_file(main_memory, memory_file);
+	puts("Writing main memory content to mem.dat");
+	write_memory_to_file(main_memory, memory_file, metadata.main_memory_size);
 
-	puts("Chose a mapping method:");
+	puts("Choose a mapping method:");
 	puts("1 - Direct | 2 - Set Associative | 3 - Fully Associative");
 	scanf("%d", &mapping_method);
+
+	if (mapping_method < 1 || mapping_method > 3) {
+		fprintf(stderr, "Not a valid input. Please restart the program.\n");
+	}
+	
+	char *mapping_method_str;
+
+	switch (mapping_method) {
+		case 1:
+			mapping_method_str = "DIRECT";
+			break;
+		case 2:
+			mapping_method_str = "SET ASSOCIATIVE";
+			break;
+		case 3:
+			mapping_method_str = "FULLY ASSOCIATIVE";
+			break;
+		default:
+			mapping_method_str = "UNKNOWN";
+	}
+
+	fflush(cache_file);
 
 	do {
 	char inputted_addr[64]; // Plenty for this use case
 	puts("Insert a binary address (use Ctrl + C to exit):");
 	scanf("%s", inputted_addr);
+
+	int addr_as_index = strtol(inputted_addr,NULL, 2)/LINESIZE;
 	
-	// Check for end of program
-	if(strcmp(inputted_addr, "exit") == 0) {
-		puts("Program terminated.");
-		break;
+	fprintf(cache_file, "MAPPING: %s\n", mapping_method_str);
+	fprintf(cache_file, "ADDRESS INSERTED: %s\n", inputted_addr);
+	
+	cache_hit_or_miss = hit_or_miss(cache_memory, main_memory[addr_as_index]);
+
+	if(cache_hit_or_miss == 1) {
+		int *data = main_memory[addr_as_index];
+		puts("CACHE MISS");
+		fprintf(cache_file, "CACHE MISS\n");
+		fprintf(miss_log_file, "%s\n", inputted_addr);
+		map_to_cache(cache_memory, data, mapping_method, addr_as_index);
+	} else if (cache_hit_or_miss == 0) {
+		puts("CACHE HIT");
+		fprintf(cache_file, "CACHE HIT\n");
+		fprintf(hit_log_file, "%s\n", inputted_addr);
 	}
-	int addr_as_index = strtol(inputted_addr,NULL, 2);
+	
+	log_cache_state(cache_memory, cache_file);
+	fflush(cache_file);
 	} while (1);
 
 	fclose(memory_file);
@@ -98,8 +146,8 @@ int **make_memory(int rows, int mem_type){
 	return mem;
 }
 
-void write_memory_to_file(int **memory_unit, FILE* file) {
-	int num_blocks = metadata.main_memory_size/LINESIZE;
+void write_memory_to_file(int **memory_unit, FILE* file,long memory_size) {
+	int num_blocks = memory_size/LINESIZE;
 	char spaces[12]; //+1 for \0 character
 	
 	memset(spaces, ' ', 10);
@@ -130,9 +178,62 @@ void write_memory_to_file(int **memory_unit, FILE* file) {
 	}
 
 	fflush(file);
-
 }
- 
+
+void log_cache_state(int **cache, FILE* cache_file) {
+	long num_of_lines = metadata.cache_size/LINESIZE;
+
+	for(int i = 0; i < num_of_lines; i++) {
+		printf("%02X: [ ", i);
+		for (int j = 0; j < LINESIZE; j++) {
+			printf("%2x ", cache[i][j]);
+		}
+		printf("]\n");
+	}
+	write_memory_to_file(cache, cache_file, metadata.cache_size);
+}
+
+int hit_or_miss(int **cache, int* block) {
+	int cache_hit_or_miss = 1;
+	int lines_eval[LINESIZE];
+	long num_of_lines = metadata.cache_size/LINESIZE;
+
+	for(int k = 0; k < LINESIZE; k++) {
+		lines_eval[k] = 0;
+	}
+
+	for(int i = 0; i < num_of_lines; i++) {
+		for (int j = 0; j < LINESIZE; j++) {
+			if (cache[i][j] != block[j]) {
+				lines_eval[i] = 1;
+				break;
+			}
+		}
+	}
+
+	for(int k = 0; k < LINESIZE; k++) {
+		if(lines_eval[k] == 0) {
+			cache_hit_or_miss = 0;
+		}
+	}
+	return cache_hit_or_miss;
+}
+
+void map_to_cache(int **cache, int *block, int mapping_method, int block_index) {
+	long num_of_lines = metadata.cache_size/LINESIZE;
+	if (mapping_method == 1) {
+		int cache_line = (int) block_index % num_of_lines;
+		cache[cache_line] = block;
+	} else if (mapping_method == 2) {
+		// Who knows?
+	} else if (mapping_method == 3) {
+		int line_index = rand() % num_of_lines;
+		cache[line_index] = block;
+	} else {
+		fprintf(stderr, "Error! No mapping method found.\n");
+	}
+}
+
 void print_ui() {
 	puts("\t\t\t\t-----------------------------------");
 	puts("\t\t\t\t| Welcome to the memory simulator |");
