@@ -98,12 +98,19 @@ int main(void) {
 		int *data = main_memory[addr_as_index];
 		puts("CACHE MISS");
 		fprintf(cache_file, "CACHE MISS\n");
+
 		fprintf(miss_log_file, "%s\n", inputted_addr);
+		fflush(miss_log_file);
+
 		map_to_cache(cache_memory, data, mapping_method, addr_as_index);
+
 	} else if (cache_hit_or_miss == 0) {
+
 		puts("CACHE HIT");
 		fprintf(cache_file, "CACHE HIT\n");
+		
 		fprintf(hit_log_file, "%s\n", inputted_addr);
+		fflush(hit_log_file);
 	}
 	
 	log_cache_state(cache_memory, cache_file);
