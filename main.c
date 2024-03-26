@@ -8,6 +8,7 @@
 // cache is set to zero, memory is set
 // to a random from 0 to 255
 void print_ui();
+int compare_data(int *data, int *line);
 int hit_or_miss(int **cache, int* block);
 int **make_memory(int rows, int mem_type);
 void log_cache_state(int **cache, FILE* cache_file);
@@ -193,30 +194,16 @@ void log_cache_state(int **cache, FILE* cache_file) {
 	write_memory_to_file(cache, cache_file, metadata.cache_size);
 }
 
-int hit_or_miss(int **cache, int* block) {
-	int cache_hit_or_miss = 1;
-	int lines_eval[LINESIZE];
+int hit_or_miss(int **cache, int *block) {
 	long num_of_lines = metadata.cache_size/LINESIZE;
 
-	for(int k = 0; k < LINESIZE; k++) {
-		lines_eval[k] = 0;
-	}
-
 	for(int i = 0; i < num_of_lines; i++) {
-		for (int j = 0; j < LINESIZE; j++) {
-			if (cache[i][j] != block[j]) {
-				lines_eval[i] = 1;
-				break;
-			}
+		if (compare_data(block, cache[i]) == 0) {
+			return 0;
 		}
-	}
+	 }
 
-	for(int k = 0; k < LINESIZE; k++) {
-		if(lines_eval[k] == 0) {
-			cache_hit_or_miss = 0;
-		}
-	}
-	return cache_hit_or_miss;
+	return 1;
 }
 
 void map_to_cache(int **cache, int *block, int mapping_method, int block_index) {
@@ -234,6 +221,14 @@ void map_to_cache(int **cache, int *block, int mapping_method, int block_index) 
 	}
 }
 
+int compare_data(int *data, int *line) {
+    for (int i = 0; i < LINESIZE; i++) {
+        if (data[i] != line[i]) {
+            return 1; // Lists are not equal
+        }
+    }
+    return 0; // Lists are equal
+}
 void print_ui() {
 	puts("\t\t\t\t-----------------------------------");
 	puts("\t\t\t\t| Welcome to the memory simulator |");
