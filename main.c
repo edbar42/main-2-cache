@@ -17,13 +17,15 @@ void write_memory_to_file(int **memory_unit, FILE* file, long memory_size);
 
 int LINESIZE;
 
-struct Metadata {
+typedef int** memory;
+
+typedef struct {
 	long main_memory_size;
 	long cache_size;
 	unsigned int block_size;
-};
+} Metadata;
 
-struct Metadata metadata;
+Metadata metadata;
 
 int main(void) {
 	// NOTE: Used to ensure actual random numbers
@@ -49,8 +51,8 @@ int main(void) {
 	FILE *miss_log_file = fopen("miss.log", "w");
 
 	// Creates memory as an array
-	int **main_memory = make_memory(metadata.main_memory_size/LINESIZE, 0);
-	int **cache_memory = make_memory(metadata.cache_size/LINESIZE, 1);
+	memory main_memory = make_memory(metadata.main_memory_size/LINESIZE, 0);
+	memory cache_memory = make_memory(metadata.cache_size/LINESIZE, 1);
 
 	puts("Writing main memory content to mem.dat");
 	write_memory_to_file(main_memory, memory_file, metadata.main_memory_size);
@@ -124,7 +126,7 @@ int main(void) {
 }
 
 int **make_memory(int rows, int mem_type){
-	int **mem = (int**)malloc(rows * sizeof(int*));
+	 memory mem = (int**)malloc(rows * sizeof(int*));
 	if (mem == NULL) {
 		fprintf(stderr, "Memory allocation failed!\n");
 		exit(1);
@@ -154,7 +156,7 @@ int **make_memory(int rows, int mem_type){
 	return mem;
 }
 
-void write_memory_to_file(int **memory_unit, FILE* file,long memory_size) {
+void write_memory_to_file(memory memory_unit, FILE* file,long memory_size) {
 	int num_blocks = memory_size/LINESIZE;
 	char spaces[12]; //+1 for \0 character
 	
@@ -188,7 +190,7 @@ void write_memory_to_file(int **memory_unit, FILE* file,long memory_size) {
 	fflush(file);
 }
 
-void log_cache_state(int **cache, FILE* cache_file) {
+void log_cache_state(memory cache, FILE* cache_file) {
 	long num_of_lines = metadata.cache_size/LINESIZE;
 
 	for(int i = 0; i < num_of_lines; i++) {
@@ -201,7 +203,7 @@ void log_cache_state(int **cache, FILE* cache_file) {
 	write_memory_to_file(cache, cache_file, metadata.cache_size);
 }
 
-int hit_or_miss(int **cache, int *block) {
+int hit_or_miss(memory cache, int *block) {
 	long num_of_lines = metadata.cache_size/LINESIZE;
 
 	for(int i = 0; i < num_of_lines; i++) {
@@ -212,7 +214,7 @@ int hit_or_miss(int **cache, int *block) {
 	return 1;
 }
 
-void map_to_cache(int **cache, int *block, int mapping_method, int block_index) {
+void map_to_cache(memory cache, int *block, int mapping_method, int block_index) {
 	long num_of_lines = metadata.cache_size/LINESIZE;
 	if (mapping_method == 1) {
 		int cache_line = (int) block_index % num_of_lines;
