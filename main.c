@@ -1,5 +1,4 @@
 #include <time.h>
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -87,10 +86,11 @@ int main(void) {
 	puts("Insert a binary address (use Ctrl + C to exit):");
 	scanf("%s", inputted_addr);
 
-	int addr_as_index = strtol(inputted_addr,NULL, 2)/LINESIZE;
+	int addr_as_index = strtol(inputted_addr,NULL,16)/LINESIZE;
+	int addr_as_bin = strtol(inputted_addr,NULL,2);
 	
 	fprintf(cache_file, "MAPPING: %s\n", mapping_method_str);
-	fprintf(cache_file, "ADDRESS INSERTED: %s\n", inputted_addr);
+	fprintf(cache_file, "ADDRESS INSERTED: %08b\n", addr_as_bin);
 	
 	cache_hit_or_miss = hit_or_miss(cache_memory, main_memory[addr_as_index]);
 
@@ -112,7 +112,7 @@ int main(void) {
 		fprintf(hit_log_file, "%s\n", inputted_addr);
 		fflush(hit_log_file);
 	}
-	
+
 	log_cache_state(cache_memory, cache_file);
 	fflush(cache_file);
 	} while (1);
@@ -209,7 +209,6 @@ int hit_or_miss(int **cache, int *block) {
 			return 0;
 		}
 	 }
-
 	return 1;
 }
 
